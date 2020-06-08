@@ -291,8 +291,8 @@ def createViews(renderDate):
         # Close connection
         cursor.close()
         connection.close()
-    except:
-        print "SQL-Error occurred, closing connection..."
+    except Exception as e:
+        print "SQL-Error occurred: " + str(e) + " - closing connection..."
         try:
             cursor.close()
             connection.close()
@@ -469,7 +469,7 @@ if __name__ == "__main__":
     #      + str(right) + ", top=" + str(top) + ", port=" + str(port)
 
     # bbox = (13.5124, 52.4511, 13.5461, 52.4626) --> HTW
-    bbox = (minlon, minlat, maxlon, maxlat)
+    bbox = (left, bottom, right, top)
 
     mapfile = os.path.join(DIRNAME, "osm.xml")
 
