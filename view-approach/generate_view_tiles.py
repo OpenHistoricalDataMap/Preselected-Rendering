@@ -8,6 +8,7 @@ import threading
 
 import mapnik
 
+import socket
 import psycopg2
 import datetime
 import getopt
@@ -21,6 +22,11 @@ NUM_THREADS = 4
 DIRNAME = os.path.dirname(__file__)
 DATABASE_SOURCE = os.path.join(DIRNAME, 'inc/datasource-settings.xml.inc')
 PREFIX_SOURCE = os.path.join(DIRNAME, 'inc/settings.xml.inc')
+
+
+#################################################################################################
+## mapnik stuff
+#################################################################################################
 
 
 def minmax(a, b, c):
@@ -192,6 +198,99 @@ def render_tiles(bbox, mapfile, tile_dir, minZoom=1, maxZoom=18, name="unknown",
         renderers[i].join()
 
 
+#################################################################################################
+## connection related
+#################################################################################################
+
+
+def doConnection(port):
+    print "not yet"
+
+    if port < 5000:
+        print "Port number needs to be higher than 5000 but was " + str(port)
+        sys.exit(1)
+
+    address = ("localhost", int(port))
+
+    try:
+        #create an AF_INET, STREAM socket (TCP)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(address)
+        s.listen(1)
+        print "Starting to listen for a connection..."
+        connection, client_address = s.accept()
+        print "Connection accepted from: " +  str(client_address)
+        stopped = False
+        while not stopped:
+            data = connection.recv(4096)
+            print "Received message: >" + data + "<"
+            if data == "":
+                break
+            stopped = handle_request(data)
+    except socket.error, msg:
+        print "Failed to create socket. Error code: " + str(msg[0]) + " , Error message: " + str(msg[1])
+    except KeyboardInterrupt:
+        print "KeyBoardInterrupt detected"
+    finally:
+        s.close()
+        sys.exit(1)
+
+
+def handle_request(data):
+    stopped = False
+    
+    renderDate = ""
+    zoom = -1
+    left = -200.0
+    bottom = -200.0
+    right = -200.0
+    top = -200.0
+
+    data_list = data.split('&')
+
+    #TODO: Value might be empty
+    if data_list[0].lower() == "render":
+        for i in range(1, len(data_list)):
+            kv_set = data_list[i].split("=")
+            if kv_set[0].lower() == "date":
+                renderDate = kv_set[1]
+            elif kv_set[0].lower() == "zoom":
+                zoom = kv_set[1]
+            elif kv_set[0].lower() == "left":
+                left = kv_set[1]
+            elif kv_set[0].lower() == "bottom":
+                bottom = kv_set[1]
+            elif kv_set[0].lower() == "right":
+                right = kv_set[1]
+            elif kv_set[0].lower() == "top":
+                top = kv_set[1]
+            else:
+                print "message not according to protocol (no key detected) - ignored "
+                stopped = True
+                #TODO: should not start rendering when breaking
+                break
+
+        try:
+            #TODO: date is no date? - kommt hier nciht an
+            print "Trying to render with: ", renderDate, zoom, left, bottom, right, top
+            do_render(renderDate, zoom, left, bottom, right, top)
+        except ValueError as e:
+            print e.message
+            print "Not rendering this request..."
+    
+    elif data_list[0] == "stop":
+        stopped = True
+        print "Received 'stop', stopping program..."
+    else:
+        print "message not according to protocol (no command detected) - ignored "
+    return stopped
+
+
+#################################################################################################
+## database related
+#################################################################################################
+
+
 # Retrieves the connection info for the database from inc/datasource-settings.xml.inc
 def getDatabaseSettings():
     index = 0
@@ -220,23 +319,32 @@ def getDatabaseSettings():
 # searches "text" for "name", then reads characters after "name", until it hits
 # the character "exitSymbol", then returns read characters. "exitSymbol" itself 
 # will not be returned
-def readParameter(text, name, exitSymbol):
+# raises ValueError if "name" or "end_symbol" after "name" was not found.
+def readParameter(text, name, end_symbol):
     index = text.find(name) + len(name)
 
     if index < 0:
         print "inc/database-settings.xml.inc malformed (did not find " + name + ")"
         raise ValueError("inc/database-settings.xml.inc malformed (did not find " + name + ")")
-
-    parameter = ""
-    while text[index] != exitSymbol:
-        parameter += text[index]
-        index += 1
+    
+    try:
+        parameter = read2key(text, index, end_symbol)
+    except ValueError:
+        print "inc/database-settings.xml.inc malformed (did not find ending tag for " + name + ")"
+        raise ValueError("inc/database-settings.xml.inc malformed (did not find ending tag for " + name + ")")
     return parameter
 
 
-def establishSocket(port):
-    print "not yet"
-    sys.exit(0)
+# returns a string containing all characters read in "text" from "index" to "end_symbol"
+# raises a ValueError if "end_symbol" was not found
+def read2key(text, index, end_symbol):
+    word = ""
+    while text[index] != end_symbol:
+        word += text[index]
+        if index > len(text):
+            raise ValueError("end_symbol '" + end_symbol + "' not found")
+        index += 1
+    return word
 
 
 # Changes the Prefix to "d_[renderDate]" for the osm.xml which is defined in inc/setting.xml.inc
@@ -255,6 +363,11 @@ def changePrefix(renderDate):
 
     with open(PREFIX_SOURCE, 'wt') as myfile:
         myfile.write(contents)
+
+
+#########################################################################################################
+## Database: Create and Drop View
+#########################################################################################################
 
 
 def createViews(renderDate):
@@ -344,6 +457,64 @@ def dropViews(renderDate):
         raise Exception("SQL-Error occurred")
 
 
+#########################################################################################################
+## Rendering
+#########################################################################################################
+
+
+def do_render(date, zoom, left, bottom, right, top):    
+    # validate arguments
+    try:
+        datetime.datetime.strptime(date, "%d.%m.%Y")
+    except ValueError:
+        raise ValueError("Date seems to be incorrect (dd.mm.yyyy)")
+
+    if int(zoom) < 0 or int(zoom) > 18:
+        raise ValueError("Zoom level " + str(zoom) + " seems to be incorrect (0 - 18)")
+
+    if float(left) < -180 or float(left) > 180:
+        raise ValueError("First longitude seems to be incorrect (-180.0 - +180.0)")
+
+    if float(bottom) < -90 or float(bottom) > 90:
+        raise ValueError("First latitude seems to be incorrect (-90.0 - +90.0)")
+
+    if float(right) < -180 or float(right) > 180:
+        raise ValueError("Second longitude seems to be incorrect (-180.0 - +180.0)")
+
+    if float(top) < -90 or float(top) > 90:
+        raise ValueError("Second latitude seems to be incorrect (-90.0 - +90.0)")
+
+    if float(left) > float(right):
+        raise ValueError("First longitude needs to be smaller than the second longitude")
+
+    if float(bottom) > float(top):
+        raise ValueError("First latitude needs to be smaller than the second latitude")
+
+    print "would start with these arguments:"
+    print "date=" + date + ", zoom=" + str(zoom) + ", left=" + str(left) + ", bottom="\
+        + str(bottom) + ", right=" + str(right) + ", top=" + str(top) + ", port=" + str(port)
+"""
+    # bbox = (13.5124, 52.4511, 13.5461, 52.4626) --> HTW - command: python generate_view_tiles.py -d 01.06.2020 -z 16 -l 13.5124 -b 52.4511 -r 13.5461 -t 52.4626
+    bbox = (left, bottom, right, top)
+
+    mapfile = os.path.join(DIRNAME, "osm.xml")
+
+    tile_dir = os.environ['HOME'] + "/osm/tiles/" + renderDate.replace('.', '-') + "/"
+
+    changePrefix(renderDate)
+
+    createViews(renderDate)
+
+    render_tiles(bbox, mapfile, tile_dir, zoom, zoom, "Map")
+
+    dropViews(renderDate)
+"""
+
+
+#########################################################################################################
+## Use Script from CLI
+#########################################################################################################
+
 def printUsage():
     print """
 Usage:
@@ -388,7 +559,6 @@ if __name__ == "__main__":
     top = -200.0
     port = -1
 
-    # TODO: quit option to stop listening
     # get options
     try:
         options, arguments = getopt.getopt(sys.argv[1:], "hd:z:l:b:r:t:p:",
@@ -428,57 +598,14 @@ if __name__ == "__main__":
             print "See --help for usage."
             sys.exit(1)
         else:
-            establishSocket(port)
-            
-    # validate arguments
-    try:
-        datetime.datetime.strptime(renderDate, "%d.%m.%Y")
-    except ValueError:
-        print "Date seems to be incorrect (dd.mm.yyyy), not executing..."
-        raise ValueError("Date seems to be incorrect (dd.mm.yyyy)")
-
-    if int(zoom) < 0 or int(zoom) > 18:
-        print "Zoom level " + str(zoom) + " seems to be incorrect (0 - 18), not executing..."
-        raise ValueError("Zoom level " + str(zoom) + " seems to be incorrect (0 - 18)")
-
-    if float(left) < -180 or float(left) > 180:
-        print "First longitude seems to be incorrect (-180.0 - +180.0), not executing..."
-        raise ValueError("First longitude seems to be incorrect (-180.0 - +180.0)")
-
-    if float(bottom) < -90 or float(bottom) > 90:
-        print "First latitude seems to be incorrect (-90.0 - +90.0), not executing..."
-        raise ValueError("First latitude seems to be incorrect (-90.0 - +90.0)")
-
-    if float(right) < -180 or float(right) > 180:
-        print "Second longitude seems to be incorrect (-180.0 - +180.0), not executing..."
-        raise ValueError("Second longitude seems to be incorrect (-180.0 - +180.0)")
-
-    if float(top) < -90 or float(top) > 90:
-        print "Second latitude seems to be incorrect (-90.0 - +90.0), not executing..."
-        raise ValueError("Second latitude seems to be incorrect (-90.0 - +90.0)")
-
-    if float(left) > float(right):
-        print "First longitude needs to be smaller than the second longitude, not executing..."
-        raise ValueError("First longitude needs to be smaller than the second longitude")
-
-    if float(bottom) > float(top):
-        print "First latitude needs to be smaller than the second latitude, not executing..."
-        raise ValueError("First latitude needs to be smaller than the second latitude")
-
-    #print "arguments: date=" + renderDate + ", zoom=" + str(zoom) + ", left=" + str(left) + ", bottom=" + str(bottom) + ", right="\
-    #      + str(right) + ", top=" + str(top) + ", port=" + str(port)
-
-    # bbox = (13.5124, 52.4511, 13.5461, 52.4626) --> HTW
-    bbox = (left, bottom, right, top)
-
-    mapfile = os.path.join(DIRNAME, "osm.xml")
-
-    tile_dir = os.environ['HOME'] + "/osm/tiles/" + renderDate.replace('.', '-') + "/"
-
-    changePrefix(renderDate)
-
-    createViews(renderDate)
-
-    render_tiles(bbox, mapfile, tile_dir, zoom, zoom, "Map")
-
-    dropViews(renderDate)
+            doConnection(port)
+    elif port == -1:
+        if renderDate != "" and zoom != -1 and left != -200.0 and bottom != -200.0 and right != -200.0 and top != -200.0:
+            do_render(renderDate, zoom, left, bottom, right, top)
+        else:
+            print "All parameters must be given to render from CLI (-d -z -l -b -r -t)."
+            print "See -h (--help) for usage."
+            sys.exit(1)
+    else:
+        print "Port needs to be positive."
+        sys.exit(1)
