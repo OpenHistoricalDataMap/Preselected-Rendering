@@ -571,17 +571,17 @@ if __name__ == "__main__":
         if opt in ("-d", "--date"):
             renderDate = arg
         elif opt in ("-z", "--zoom"):
-            zoom = arg
+            zoom = int(arg)
         elif opt in ("-l", "--left"):
-            left = arg
+            left = float(arg)
         elif opt in ("-b", "--bottom"):
-            bottom = arg
+            bottom = float(arg)
         elif opt in ("-r", "--right"):
-            right = arg
+            right = float(arg)
         elif opt in ("-t", "--top"):
-            top = arg
+            top = float(arg)
         elif opt in ("-p", "--port"):
-            port = arg
+            port = int(arg)
         elif opt in ("-h", "--help"):
             printUsage()
             sys.exit(0)
