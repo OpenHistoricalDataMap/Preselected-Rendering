@@ -13,20 +13,23 @@ import psycopg2
 import datetime
 import getopt
 
-DEG_TO_RAD = pi / 180
-RAD_TO_DEG = 180 / pi
-
-# Default number of rendering threads to spawn, should be roughly equal to number of CPU cores available
-NUM_THREADS = 4
+#################################################################################################
+## psr constants
+#################################################################################################
 
 DIRNAME = os.path.dirname(__file__)
 DATABASE_SOURCE = os.path.join(DIRNAME, 'inc/datasource-settings.xml.inc')
 PREFIX_SOURCE = os.path.join(DIRNAME, 'inc/settings.xml.inc')
 
+#################################################################################################
+## ORIGINAL GENERATE_TILES.PY
+#################################################################################################
 
-#################################################################################################
-## mapnik stuff
-#################################################################################################
+DEG_TO_RAD = pi / 180
+RAD_TO_DEG = 180 / pi
+
+# Default number of rendering threads to spawn, should be roughly equal to number of CPU cores available
+NUM_THREADS = 4
 
 
 def minmax(a, b, c):
@@ -196,6 +199,76 @@ def render_tiles(bbox, mapfile, tile_dir, minZoom=1, maxZoom=18, name="unknown",
     queue.join()
     for i in range(num_threads):
         renderers[i].join()
+"""
+if __name__ == "__main__":
+    home = os.environ['HOME']
+    try:
+        mapfile = os.environ['MAPNIK_MAP_FILE']
+    except KeyError:
+        mapfile = home + "/svn.openstreetmap.org/applications/rendering/mapnik/osm-local.xml"
+    try:
+        tile_dir = os.environ['MAPNIK_TILE_DIR']
+    except KeyError:
+        tile_dir = home + "/osm/tiles/"
+
+    if not tile_dir.endswith('/'):
+        tile_dir = tile_dir + '/'
+
+    #-------------------------------------------------------------------------
+    #
+    # Change the following for different bounding boxes and zoom levels
+    #
+    # Start with an overview
+    # World
+    bbox = (-180.0,-90.0, 180.0,90.0)
+
+    render_tiles(bbox, mapfile, tile_dir, 0, 5, "World")
+
+    minZoom = 10
+    maxZoom = 16
+    bbox = (-2, 50.0,1.0,52.0)
+    render_tiles(bbox, mapfile, tile_dir, minZoom, maxZoom)
+
+    # Muenchen
+    bbox = (11.4,48.07, 11.7,48.22)
+    render_tiles(bbox, mapfile, tile_dir, 1, 12 , "Muenchen")
+
+    # Muenchen+
+    bbox = (11.3,48.01, 12.15,48.44)
+    render_tiles(bbox, mapfile, tile_dir, 7, 12 , "Muenchen+")
+
+    # Muenchen++
+    bbox = (10.92,47.7, 12.24,48.61)
+    render_tiles(bbox, mapfile, tile_dir, 7, 12 , "Muenchen++")
+
+    # Nuernberg
+    bbox=(10.903198,49.560441,49.633534,11.038085)
+    render_tiles(bbox, mapfile, tile_dir, 10, 16, "Nuernberg")
+
+    # Karlsruhe
+    bbox=(8.179113,48.933617,8.489252,49.081707)
+    render_tiles(bbox, mapfile, tile_dir, 10, 16, "Karlsruhe")
+
+    # Karlsruhe+
+    bbox = (8.3,48.95,8.5,49.05)
+    render_tiles(bbox, mapfile, tile_dir, 1, 16, "Karlsruhe+")
+
+    # Augsburg
+    bbox = (8.3,48.95,8.5,49.05)
+    render_tiles(bbox, mapfile, tile_dir, 1, 16, "Augsburg")
+
+    # Augsburg+
+    bbox=(10.773251,48.369594,10.883834,48.438577)
+    render_tiles(bbox, mapfile, tile_dir, 10, 14, "Augsburg+")
+
+    # Europe+
+    bbox = (1.0,10.0, 20.6,50.0)
+    render_tiles(bbox, mapfile, tile_dir, 1, 11 , "Europe+")
+"""
+
+#################################################################################################
+## PRESELECTED RENDERING
+#################################################################################################
 
 
 #################################################################################################
@@ -213,7 +286,6 @@ def doConnection(port):
     address = ("localhost", int(port))
 
     try:
-        #create an AF_INET, STREAM socket (TCP)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(address)
         s.listen(1)
@@ -226,7 +298,7 @@ def doConnection(port):
             print "Received message: >" + data + "<"
             if data == "":
                 break
-            stopped = handle_request(data)
+            stopped = handle_request(data, connection)
     except socket.error, msg:
         print "Failed to create socket. Error code: " + str(msg[0]) + " , Error message: " + str(msg[1])
     except KeyboardInterrupt:
@@ -236,7 +308,7 @@ def doConnection(port):
         sys.exit(1)
 
 
-def handle_request(data):
+def handle_request(data, connection):
     stopped = False
     
     renderDate = ""
@@ -248,7 +320,6 @@ def handle_request(data):
 
     data_list = data.split('&')
 
-    #TODO: Value might be empty
     if data_list[0].lower() == "render":
         for i in range(1, len(data_list)):
             kv_set = data_list[i].split("=")
@@ -265,26 +336,40 @@ def handle_request(data):
             elif kv_set[0].lower() == "top":
                 top = kv_set[1]
             else:
-                print "message not according to protocol (no key detected) - ignored "
+                print "message not according to protocol (unknown parameter) - ignored"
+                send_error("Message not according to protocol (unknown parameter) - ignored", connection)
                 stopped = True
-                #TODO: should not start rendering when breaking
                 break
 
-        try:
-            #TODO: date is no date? - kommt hier nciht an
-            print "Trying to render with: ", renderDate, zoom, left, bottom, right, top
-            do_render(renderDate, zoom, left, bottom, right, top)
-        except ValueError as e:
-            print e.message
-            print "Not rendering this request..."
+        if not stopped:
+            try:
+                print "Trying to render with: ", renderDate, zoom, left, bottom, right, top
+                do_render(renderDate, zoom, left, bottom, right, top)
+                send_done(connection)
+            except ValueError as e:
+                print e.message
+                print "Not rendering this request..."
+                send_error(e.message, connection)
     
-    elif data_list[0] == "stop":
+    elif data_list[0] == "stop" or data_list[0] == "":
         stopped = True
-        print "Received 'stop', stopping program..."
+        print "Received " + data_list[0] + ", stopping program..."
     else:
-        print "message not according to protocol (no command detected) - ignored "
+        print "message not according to protocol (unknown command) - ignored "
+        send_error("Message not according to protocol (unknown command) - ignored", connection)
     return stopped
 
+
+def send_done(connection):
+    done_string = "done&"
+    done_string += "Rendered successfully."
+    connection.send(done_string)
+
+
+def send_error(error, connection):
+    error_string = "error&"
+    error_string += error
+    connection.send(error_string)
 
 #################################################################################################
 ## database related
@@ -461,34 +546,48 @@ def dropViews(renderDate):
 ## Rendering
 #########################################################################################################
 
+def validate_params(date, zoom, left, bottom, right, top):
+    try:
+        zoom = int(zoom)
+        left = float(left)
+        bottom = float(bottom)
+        right = float(right)
+        top = float(top)
+    except ValueError:
+        raise ValueError("One of the arguments was not correct, got: date: " + str(date) + ", zoom: " +
+                         str(zoom) + ", left: " + str(left) + ", bottom: " + str(bottom) + ", right: " +
+                         str(right) + ", top: " + str(top))
 
-def do_render(date, zoom, left, bottom, right, top):    
     # validate arguments
     try:
         datetime.datetime.strptime(date, "%d.%m.%Y")
     except ValueError:
         raise ValueError("Date seems to be incorrect (dd.mm.yyyy)")
 
-    if int(zoom) < 0 or int(zoom) > 18:
+    if zoom < 0 or zoom > 18:
         raise ValueError("Zoom level " + str(zoom) + " seems to be incorrect (0 - 18)")
 
-    if float(left) < -180 or float(left) > 180:
+    if left < -180 or left > 180:
         raise ValueError("First longitude seems to be incorrect (-180.0 - +180.0)")
 
-    if float(bottom) < -90 or float(bottom) > 90:
+    if bottom < -90 or bottom > 90:
         raise ValueError("First latitude seems to be incorrect (-90.0 - +90.0)")
 
-    if float(right) < -180 or float(right) > 180:
+    if right < -180 or right > 180:
         raise ValueError("Second longitude seems to be incorrect (-180.0 - +180.0)")
 
-    if float(top) < -90 or float(top) > 90:
+    if top < -90 or top > 90:
         raise ValueError("Second latitude seems to be incorrect (-90.0 - +90.0)")
 
-    if float(left) > float(right):
-        raise ValueError("First longitude needs to be smaller than the second longitude")
+    if left > right:
+        raise ValueError("First longitude (left) needs to be smaller than the second longitude (right)")
 
-    if float(bottom) > float(top):
-        raise ValueError("First latitude needs to be smaller than the second latitude")
+    if bottom > top:
+        raise ValueError("First latitude (bottom) needs to be smaller than the second latitude (top)")
+
+
+def do_render(date, zoom, left, bottom, right, top):
+    validate_params(date, zoom, left, bottom, right, top)
 
     print "would start with these arguments:"
     print "date=" + date + ", zoom=" + str(zoom) + ", left=" + str(left) + ", bottom="\
@@ -499,15 +598,15 @@ def do_render(date, zoom, left, bottom, right, top):
 
     mapfile = os.path.join(DIRNAME, "osm.xml")
 
-    tile_dir = os.environ['HOME'] + "/osm/tiles/" + renderDate.replace('.', '-') + "/"
+    tile_dir = os.environ['HOME'] + "/osm/tiles/" + date.replace('.', '-') + "/"
 
-    changePrefix(renderDate)
+    changePrefix(date)
 
-    createViews(renderDate)
+    createViews(date)
 
     render_tiles(bbox, mapfile, tile_dir, zoom, zoom, "Map")
 
-    dropViews(renderDate)
+    dropViews(date)
 """
 
 
@@ -546,7 +645,6 @@ Options:
 
 
 if __name__ == "__main__":
-
     if len(sys.argv) == 1:
         print "No arguments given, see --help for usage."
         sys.exit(1)
@@ -609,3 +707,5 @@ if __name__ == "__main__":
     else:
         print "Port needs to be positive."
         sys.exit(1)
+    sys.exit(0)
+
