@@ -14,22 +14,23 @@ import datetime
 import getopt
 
 #################################################################################################
-## psr constants
+## PSR constants
 #################################################################################################
 
 DIRNAME = os.path.dirname(__file__)
 DATABASE_SOURCE = os.path.join(DIRNAME, 'inc/datasource-settings.xml.inc')
 PREFIX_SOURCE = os.path.join(DIRNAME, 'inc/settings.xml.inc')
+TILE_DIR = os.environ['HOME'] + "/osm/tiles/"
 
 #################################################################################################
 ## ORIGINAL GENERATE_TILES.PY
 #################################################################################################
 
-DEG_TO_RAD = pi / 180
-RAD_TO_DEG = 180 / pi
-
 # Default number of rendering threads to spawn, should be roughly equal to number of CPU cores available
 NUM_THREADS = 4
+
+DEG_TO_RAD = pi / 180
+RAD_TO_DEG = 180 / pi
 
 
 def minmax(a, b, c):
@@ -199,7 +200,8 @@ def render_tiles(bbox, mapfile, tile_dir, minZoom=1, maxZoom=18, name="unknown",
     queue.join()
     for i in range(num_threads):
         renderers[i].join()
-"""
+
+""" this is the part of the original generate_tiles.py which was replaced
 if __name__ == "__main__":
     home = os.environ['HOME']
     try:
@@ -589,25 +591,25 @@ def validate_params(date, zoom, left, bottom, right, top):
 def do_render(date, zoom, left, bottom, right, top):
     validate_params(date, zoom, left, bottom, right, top)
 
-    print "would start with these arguments:"
+    """
+    print "Starting with these arguments:"
     print "date=" + date + ", zoom=" + str(zoom) + ", left=" + str(left) + ", bottom="\
         + str(bottom) + ", right=" + str(right) + ", top=" + str(top) + ", port=" + str(port)
-"""
-    # bbox = (13.5124, 52.4511, 13.5461, 52.4626) --> HTW - command: python generate_view_tiles.py -d 01.06.2020 -z 16 -l 13.5124 -b 52.4511 -r 13.5461 -t 52.4626
+    """
+
     bbox = (left, bottom, right, top)
 
     mapfile = os.path.join(DIRNAME, "osm.xml")
 
-    tile_dir = os.environ['HOME'] + "/osm/tiles/" + date.replace('.', '-') + "/"
+    output_directory = TILE_DIR + date.replace('.', '-') + "/"
 
     changePrefix(date)
 
     createViews(date)
 
-    render_tiles(bbox, mapfile, tile_dir, zoom, zoom, "Map")
+    render_tiles(bbox, mapfile, output_directory, zoom, zoom, "Map")
 
     dropViews(date)
-"""
 
 
 #########################################################################################################
@@ -707,5 +709,5 @@ if __name__ == "__main__":
     else:
         print "Port needs to be positive."
         sys.exit(1)
-    sys.exit(0)
 
+    sys.exit(0)
