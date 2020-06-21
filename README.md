@@ -1,4 +1,4 @@
-# Pre-Selected Rendering
+# Preselected Rendering
 
 This project is a proof of concept. It aims to use mapnik 2 to render data under certain conditions mapnik itself has no concept of. In our case this condition is time (OHDM-Project: LINK).
 To ensure simple usage, the goal was to change as little as possible about mapnik and the original stylesheets.
