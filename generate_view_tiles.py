@@ -279,8 +279,6 @@ if __name__ == "__main__":
 
 
 def doConnection(port):
-    print "not yet"
-
     if port < 5000:
         print "Port number needs to be higher than 5000 but was " + str(port)
         sys.exit(1)
