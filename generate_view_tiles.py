@@ -549,19 +549,7 @@ def dropViews(renderDate):
 ## Rendering
 #########################################################################################################
 
-def validate_params(date, zoom, left, bottom, right, top):
-    try:
-        zoom = int(zoom)
-        left = float(left)
-        bottom = float(bottom)
-        right = float(right)
-        top = float(top)
-    except ValueError:
-        raise ValueError("One of the arguments was not correct, got: date: " + str(date) + ", zoom: " +
-                         str(zoom) + ", left: " + str(left) + ", bottom: " + str(bottom) + ", right: " +
-                         str(right) + ", top: " + str(top))
-
-    # validate arguments
+def validate_values(date, zoom, left, bottom, right, top):
     try:
         datetime.datetime.strptime(date, "%d.%m.%Y")
     except ValueError:
@@ -590,7 +578,18 @@ def validate_params(date, zoom, left, bottom, right, top):
 
 
 def do_render(date, zoom, left, bottom, right, top):
-    validate_params(date, zoom, left, bottom, right, top)
+    try:
+        zoom = int(zoom)
+        left = float(left)
+        bottom = float(bottom)
+        right = float(right)
+        top = float(top)
+    except ValueError:
+        raise ValueError("One of the arguments was not correct, got: date: " + str(date) + ", zoom: " +
+                         str(zoom) + ", left: " + str(left) + ", bottom: " + str(bottom) + ", right: " +
+                         str(right) + ", top: " + str(top))
+
+    validate_values(date, zoom, left, bottom, right, top)
 
     """
     print "Starting with these arguments:"
@@ -598,10 +597,12 @@ def do_render(date, zoom, left, bottom, right, top):
         + str(bottom) + ", right=" + str(right) + ", top=" + str(top) + ", port=" + str(port)
     """
 
+    # bbox = (13.5124, 52.4511, 13.5461, 52.4626) --> example command: python generate_view_tiles.py -d 01.06.2020 -z 16 -l 13.5124 -b 52.4511 -r 13.5461 -t 52.4626
     bbox = (left, bottom, right, top)
 
     mapfile = os.path.join(DIRNAME, "osm.xml")
 
+    global TILE_DIR
     output_directory = TILE_DIR + date.replace('.', '-') + "/"
 
     changePrefix(date)
@@ -712,3 +713,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     sys.exit(0)
+
