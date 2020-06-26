@@ -1,12 +1,16 @@
 # Preselected Rendering
 
-This project is a proof of concept. It aims to use mapnik 2 to render data under certain conditions mapnik itself has no concept of. In our case this condition is time (OHDM-Project: LINK).
+This project is a proof of concept. It aims to use mapnik 2 to render data under certain conditions mapnik itself has no concept of. In our case this condition is time ([OHDM-Project](https://github.com/OpenHistoricalDataMap)).
 To ensure simple usage, the goal was to change as little as possible about mapnik and the original stylesheets.
 
 - To read about the concept and example-implementation, please refer to LINK.
 - The installation guide is found [here](https://github.com/OpenHistoricalDataMap/Preselected-Rendering/wiki/Deployment).
 
 ## Files and Directories
+
+This repository consists mainly of files from the repository [OpenStreetMap/mapnik-stylesheets](https://github.com/openstreetmap/mapnik-stylesheets), but only of files strictly needed for this project. The only addition is the file 'generate_view_tiles' which itself is a modified version of 'generate_tiles' in the original repository.
+
+You can however use 'generate_view_tiles' copied into the original repository, if you want to use some of the tools it contains.
 
 ### generate_image.py
 A script (from the original repository [OpenStreetMap/mapnik-stylesheets](https://github.com/openstreetmap/mapnik-stylesheets)) to generate a map image from OSM data using Mapnik. It will read mapping instructions from 'osm.xml' and write the finished map to 'image.png'. You have to change the script to change the bounding box or image size.
@@ -42,5 +46,5 @@ Directory with icons and highway shield images.
 
 ---
 
-### world_boundaries/ (will not be included)
+### world_boundaries/ (not included - created in deployment process)
 Directory containing shapefiles to render current borders and coastlines. Since this is fairly useless in the context of time-sensitive rendering, please refer to our documentation if you want to change it: LINK.
