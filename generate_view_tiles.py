@@ -310,6 +310,7 @@ def doConnection(port):
 
 def handle_request(data, connection):
     stopped = False
+    rendering = True
     
     renderDate = ""
     zoom = -1
@@ -338,10 +339,10 @@ def handle_request(data, connection):
             else:
                 print "message not according to protocol (unknown parameter) - ignored"
                 send_error("Message not according to protocol (unknown parameter) - ignored", connection)
-                stopped = True
+                rendering = False
                 break
 
-        if not stopped:
+        if rendering:
             try:
                 print "Trying to render with: ", renderDate, zoom, left, bottom, right, top
                 do_render(renderDate, zoom, left, bottom, right, top)
