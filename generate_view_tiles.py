@@ -338,7 +338,7 @@ def handle_request(data, connection):
                 top = kv_set[1]
             else:
                 print "message not according to protocol (unknown parameter) - ignored"
-                send_error("Message not according to protocol (unknown parameter) - ignored", connection)
+                send_error("PARAM", "Message not according to protocol (unknown parameter) - ignored", connection)
                 rendering = False
                 break
 
@@ -350,14 +350,14 @@ def handle_request(data, connection):
             except ValueError as e:
                 print e.message
                 print "Not rendering this request..."
-                send_error(e.message, connection)
+                send_error("VALUE", e.message, connection)
     
     elif data_list[0] == "stop" or data_list[0] == "":
         stopped = True
         print "Received " + data_list[0] + ", stopping program..."
     else:
         print "message not according to protocol (unknown command) - ignored "
-        send_error("Message not according to protocol (unknown command) - ignored", connection)
+        send_error("CMD", "Message not according to protocol (unknown command) - ignored", connection)
     return stopped
 
 
@@ -367,9 +367,11 @@ def send_done(connection):
     connection.send(done_string)
 
 
-def send_error(error, connection):
-    error_string = "error&"
-    error_string += error
+def send_error(errortype, errormessage, connection):
+    error_string = "error"
+    error_string += errortype
+    error_string += "&"
+    error_string += errormessage
     connection.send(error_string)
 
 #################################################################################################
