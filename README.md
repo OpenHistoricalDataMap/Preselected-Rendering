@@ -3,7 +3,7 @@
 This project is a proof of concept. It aims to use mapnik 2 to render data under certain conditions mapnik itself has no concept of. In our case this condition is time ([OHDM-Project](https://github.com/OpenHistoricalDataMap)).
 To ensure simple usage, the goal was to change as little as possible about mapnik and the original stylesheets.
 
-- To read about the concept and example-implementation, please refer to LINK.
+- To read about the concept and example-implementation, please refer to [here](https://github.com/OpenHistoricalDataMap/Preselected-Rendering/wiki/Concept).
 - The installation guide is found [here](https://github.com/OpenHistoricalDataMap/Preselected-Rendering/wiki/Deployment).
 
 ## Files and Directories
