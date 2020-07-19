@@ -605,6 +605,9 @@ def do_render(date, zoom, left, bottom, right, top):
     global TILE_DIR
     output_directory = TILE_DIR + date.replace('.', '-') + "/"
 
+    if not os.path.isdir(output_directory):
+        os.makedirs(output_directory)
+
     changePrefix(date)
 
     createViews(date)
