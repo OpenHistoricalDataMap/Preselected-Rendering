@@ -47,4 +47,4 @@ Directory with icons and highway shield images.
 ---
 
 ### world_boundaries/ (not included - created in deployment process)
-Directory containing shapefiles to render current borders and coastlines. Since this is fairly useless in the context of time-sensitive rendering, please refer to our documentation if you want to change it: LINK.
+Directory containing shapefiles to render current borders and coastlines. Since this is fairly useless in the context of time-sensitive rendering, please refer to [Issues](https://github.com/OpenHistoricalDataMap/Preselected-Rendering/wiki/issues) if you want to change it.
